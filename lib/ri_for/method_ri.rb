@@ -61,41 +61,13 @@ module SourceLocationDesc
     method_name = $2
     full_name = class_name + joiner + method_name
     sig = "sig: #{full_name} arity #{arity}"
-    doc << sig
+    # doc << sig
     param_string = sig
 
     # now gather up any other information we now about it, in case there are no rdocs, so we can see it early...
 
     if !(respond_to? :source_location)
-      # pull out names for 1.8
-      unless RUBY_PLATFORM =~ /java/
-        begin
-          klass = eval(class_name)
-          # we don't call to_ruby to overcome ruby2ruby bug http://rubyforge.org/tracker/index.php?func=detail&aid=26891&group_id=1513&atid=5921
-          if joiner == '#'
-            raw_code = ParseTree.new.parse_tree_for_method(klass, method_name)
-          else
-            raw_code = ParseTree.new.parse_tree_for_method(klass.singleton_class, method_name) # singleton_class
-          end
-          doc << Ruby2Ruby.new.process(ParseTree.new.process(raw_code))
-  
-          args = Arguments.names(klass, method_name, false) rescue Arguments.names(klass.singleton_class, method_name, false)
-          out = []
-          args.each{|arg_pair|
-            out << arg_pair.join(' = ')
-          } if args
-          out = out.join(', ')
-          return out if want_just_summary
-  
-          param_string = "Parameters: #{method_name}(" + out + ")"
-          doc << param_string unless want_the_description_returned
-        rescue Exception => e
-          doc << "appears to be a c method"
-          puts "fail to parse tree: #{class_name} #{e} #{e.backtrace}" if $DEBUG
-        end
-      else
-        doc << "jruby does not allow introspection of method parameter names in 1.8.x AFAIK"
-      end
+
     else
       # 1.9.x or REE
       file, line = source_location
@@ -110,9 +82,9 @@ module SourceLocationDesc
         doc << sig
         head.reverse_each do |line|
           break unless line =~ /^\s*#(.*)/
-          doc.unshift "     " + $1.strip
+          # doc.unshift "     " + $1.strip
         end
-        doc.unshift " at #{file}:#{line}"
+        # doc.unshift " at #{file}:#{line}"
 
         # now the real code will end with 'end' same whitespace as the first
         sig_white_space = sig.scan(/^\W+/)[0] || ""
@@ -125,50 +97,24 @@ module SourceLocationDesc
         }
         already_got_ri = true
         param_string = sig
-        return sig + "\n" + head[0] if want_just_summary
+        # return sig + "\n" + head[0] if want_just_summary
       else
-        doc << 'appears to be a c method'
-      end
-      if respond_to? :parameters
-        doc << "Original code signature: %s" % sig.to_s.strip if sig
-        doc << "#parameters signature: %s( %p )" % [name, parameters]
+        # doc << 'appears to be a c method'
       end
     end
-
-    puts doc unless want_the_description_returned
-
-    unless (already_got_ri || want_just_summary)
-      require 'rdoc'
-      require 'rdoc/ri/driver'
-
-      # show default RI for it
-      begin
-        puts 'Searching ri for', sig, '...'
-        RDoc::RI::Driver.run [full_name, '--no-pager']
-      rescue *[StandardError, SystemExit]
-        # not found
-      ensure
-        puts '(end ri)'
-      end
-    end
-
-    if want_the_description_returned # give them something they can examine
-      doc
-    else
-      param_string.strip # return one liner
-    end
+    doc.join.length
 
   end
-  
+
   alias :desc :ri
-  
+
 end
 
 # TODO mixin from a separate module
 
 class Object
   # currently rather verbose, but will attempt to describe all it knows about a method
-  def ri_for name, options = {}
+  def count_for name, options = {}
     if self.is_a?(Class) || self.is_a?(Module)
       # i.e. String.strip
       begin
@@ -186,7 +132,7 @@ class Object
   end
 end
 
-class Method; 
+class Method;
   include SourceLocationDesc
   alias ri_for ri # allow for File.method(:delete).ri_for as well
 end
